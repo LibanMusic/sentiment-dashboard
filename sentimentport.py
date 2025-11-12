@@ -13,13 +13,16 @@ import os
 API_KEY = os.getenv("NEWS_API_KEY")  # Add in Streamlit Cloud under "Settings → Secrets"
 
 analyzer = SentimentIntensityAnalyzer()
-from transformers import AutoTokenizer, AutoModelForSequenceClassification
+from transformers import AutoTokenizer, AutoModelForSequenceClassification, pipeline
+import streamlit as st
+import os
 
-with st.spinner("Loading FinBERT model..."):
+with st.spinner("🔄 Loading FinBERT model... please wait (first time may take 30–60s)"):
     tokenizer = AutoTokenizer.from_pretrained("ProsusAI/finbert")
-    model = AutoModelForSequenceClassification.from_pretrained("ProsusAI/finbert")
+    model = AutoModelForSequenceClassification.from_pretrained("ProsusAI/finbert", torch_dtype="auto")
     finbert = pipeline("text-classification", model=model, tokenizer=tokenizer, device=-1)
 st.success("✅ FinBERT model loaded successfully!")
+
 
 
 
