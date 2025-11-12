@@ -1,0 +1,9 @@
+pandas
+numpy
+matplotlib
+streamlit
+requests
+vaderSentiment
+transformers
+torch
+tqdm
