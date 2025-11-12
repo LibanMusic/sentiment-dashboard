@@ -7,3 +7,6 @@ vaderSentiment
 transformers
 torch
 tqdm
+transformers==4.40.2
+torch==2.2.1
+
