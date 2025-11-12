@@ -17,11 +17,20 @@ from transformers import AutoTokenizer, AutoModelForSequenceClassification, pipe
 import streamlit as st
 import os
 
-with st.spinner("🔄 Loading FinBERT model... please wait (first time may take 30–60s)"):
+@st.cache_resource(show_spinner=True)
+def load_finbert():
+    """Load FinBERT model and tokenizer once per session."""
     tokenizer = AutoTokenizer.from_pretrained("ProsusAI/finbert")
-    model = AutoModelForSequenceClassification.from_pretrained("ProsusAI/finbert", torch_dtype="auto")
-    finbert = pipeline("text-classification", model=model, tokenizer=tokenizer, device=-1)
-st.success("✅ FinBERT model loaded successfully!")
+    model = AutoModelForSequenceClassification.from_pretrained(
+        "ProsusAI/finbert", torch_dtype="auto"
+    )
+    return pipeline("text-classification", model=model, tokenizer=tokenizer, device=-1)
+
+with st.spinner("🔄 Loading FinBERT model (first run may take ~30s)..."):
+    finbert = load_finbert()
+st.success("✅ FinBERT model ready!")
+
+
 
 
 
