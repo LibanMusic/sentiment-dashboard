@@ -13,7 +13,14 @@ import os
 API_KEY = os.getenv("NEWS_API_KEY")  # Add in Streamlit Cloud under "Settings → Secrets"
 
 analyzer = SentimentIntensityAnalyzer()
-finbert = pipeline("text-classification", model="ProsusAI/finbert", device=-1)
+from transformers import AutoTokenizer, AutoModelForSequenceClassification
+
+with st.spinner("Loading FinBERT model..."):
+    tokenizer = AutoTokenizer.from_pretrained("ProsusAI/finbert")
+    model = AutoModelForSequenceClassification.from_pretrained("ProsusAI/finbert")
+    finbert = pipeline("text-classification", model=model, tokenizer=tokenizer, device=-1)
+st.success("✅ FinBERT model loaded successfully!")
+
 
 
 # Define your sectors
