@@ -1,10 +1,10 @@
+streamlit
 pandas
 numpy
 matplotlib
-streamlit
 requests
-vaderSentiment
 tqdm
-transformers==4.40.2
-torch==2.2.1
+vaderSentiment
+transformers==4.45.1
+torch==2.5.0
 
