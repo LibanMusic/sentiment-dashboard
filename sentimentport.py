@@ -160,3 +160,64 @@ ax.set_xlabel("Z-Score (Relative Sentiment)")
 ax.set_title("Sector Sentiment (FinBERT-Weighted)")
 st.pyplot(fig)
 
+# === SENTIMENT BACKTEST (TECH & MARKET vs S&P 500) ===
+import datetime
+import yfinance as yf
+
+today = datetime.date.today().isoformat()
+HIST_FILE = "sentiment_history.csv"
+
+# --- Extract today's Tech & Market sentiment ---
+tech_row = df_sentiment[df_sentiment["Sector"] == "Technology sector"].iloc[0]
+tech_sent = tech_row["Weighted Sentiment"]
+market_sent = df_sentiment["Weighted Sentiment"].mean()
+
+df_new = pd.DataFrame({
+    "Date": [today],
+    "Tech Sentiment": [tech_sent],
+    "Market Sentiment": [market_sent]
+})
+
+# --- Append / update history ---
+if os.path.exists(HIST_FILE):
+    df_hist = pd.read_csv(HIST_FILE)
+    df_hist = pd.concat([df_hist, df_new]).drop_duplicates(subset=["Date"], keep="last")
+else:
+    df_hist = df_new
+
+df_hist.to_csv(HIST_FILE, index=False)
+
+# --- Load S&P500 data for same period ---
+sp500 = yf.download("^GSPC", start=df_hist["Date"].min(), end=today)
+sp500 = sp500.reset_index()[["Date", "Adj Close"]]
+sp500.rename(columns={"Adj Close": "S&P500"}, inplace=True)
+
+# --- Merge all datasets ---
+df_merged = pd.merge(df_hist, sp500, on="Date", how="inner")
+
+# --- Normalize for comparison ---
+for col in ["Tech Sentiment", "Market Sentiment", "S&P500"]:
+    df_merged[f"{col} (Norm)"] = (df_merged[col] - df_merged[col].mean()) / df_merged[col].std()
+
+# --- Plot comparison ---
+st.subheader("📈 Backtest: Tech & Market Sentiment vs S&P 500")
+fig, ax = plt.subplots(figsize=(8, 4))
+ax.plot(df_merged["Date"], df_merged["Tech Sentiment (Norm)"], label="Tech Sentiment (Normalized)")
+ax.plot(df_merged["Date"], df_merged["Market Sentiment (Norm)"], label="Market Sentiment (Normalized)")
+ax.plot(df_merged["Date"], df_merged["S&P500 (Norm)"], label="S&P 500 (Normalized)")
+ax.set_xlabel("Date")
+ax.set_ylabel("Normalized Value")
+ax.legend()
+ax.set_title("Technology & Market Sentiment vs S&P 500 Trend")
+st.pyplot(fig)
+
+# --- Display correlation statistics ---
+corr_tech = df_merged["Tech Sentiment"].corr(df_merged["S&P500"])
+corr_market = df_merged["Market Sentiment"].corr(df_merged["S&P500"])
+st.markdown(f"""
+**📊 Correlation with S&P 500**  
+- Tech Sentiment → S&P 500: `{corr_tech:.3f}`  
+- Market Sentiment → S&P 500: `{corr_market:.3f}`
+""")
+
+
