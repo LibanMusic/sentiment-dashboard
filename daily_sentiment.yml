@@ -1,0 +1,66 @@
+name: Daily Tech & Market Sentiment Update
+
+on:
+  schedule:
+    - cron: "0 7 * * *"  # Runs every day at 07:00 UTC
+  workflow_dispatch:      # Allow manual trigger in GitHub Actions
+
+jobs:
+  update-sentiment:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install yfinance
+
+      - name: Run daily sentiment update
+        env:
+          NEWS_API_KEY: ${{ secrets.NEWS_API_KEY }}
+        run: |
+          echo "🚀 Running daily Tech + Market sentiment update..."
+          python - <<'EOF'
+          import datetime, os, pandas as pd
+          import app  # 👈 imports your Streamlit app directly
+
+          # Access the computed sentiment DataFrame from your app
+          df_sentiment = app.get_sector_sentiment(os.getenv("NEWS_API_KEY"))
+
+          today = datetime.date.today().isoformat()
+          tech_sent = df_sentiment.loc[df_sentiment["Sector"] == "Technology sector", "Weighted Sentiment"].mean()
+          market_sent = df_sentiment["Weighted Sentiment"].mean()
+
+          df_new = pd.DataFrame({
+              "Date": [today],
+              "Tech Sentiment": [round(tech_sent, 4)],
+              "Market Sentiment": [round(market_sent, 4)]
+          })
+
+          HIST_FILE = "sentiment_history.csv"
+          if os.path.exists(HIST_FILE):
+              df_hist = pd.read_csv(HIST_FILE)
+              df_hist = pd.concat([df_hist, df_new]).drop_duplicates(subset=["Date"], keep="last")
+          else:
+              df_hist = df_new
+
+          df_hist.to_csv(HIST_FILE, index=False)
+          print("✅ Sentiment data updated successfully.")
+          EOF
+
+      - name: Commit and push updates
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add sentiment_history.csv
+          git commit -m "📅 Daily Tech & Market Sentiment Update" || echo "No changes to commit"
+          git push
