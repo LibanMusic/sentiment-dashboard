@@ -161,26 +161,19 @@ ax.set_title("Sector Sentiment (FinBERT-Weighted)")
 st.pyplot(fig)
 
 # === SENTIMENT BACKTEST (TECH & MARKET vs S&P 500) ===
-# === SENTIMENT BACKTEST (TECH & MARKET vs S&P 500) ===
+# === LONG-TERM SENTIMENT vs LOG(S&P 500) ===
 import datetime
+import numpy as np
 import yfinance as yf
 
 today = datetime.date.today().isoformat()
 HIST_FILE = "sentiment_history.csv"
 
-# --- Extract today's Tech & Market sentiment ---
-try:
-    tech_row = df_sentiment[df_sentiment["Sector"] == "Technology sector"].iloc[0]
-    tech_sent = tech_row["Weighted Sentiment"]
-except IndexError:
-    tech_sent = np.nan
-    st.warning("⚠️ Could not find 'Technology sector' in the sentiment data.")
-
+# --- Extract today's market sentiment ---
 market_sent = df_sentiment["Weighted Sentiment"].mean()
 
 df_new = pd.DataFrame({
     "Date": [today],
-    "Tech Sentiment": [tech_sent],
     "Market Sentiment": [market_sent]
 })
 
@@ -191,73 +184,46 @@ if os.path.exists(HIST_FILE):
 else:
     df_hist = df_new
 
-# ✅ Convert Date to datetime for consistency
 df_hist["Date"] = pd.to_datetime(df_hist["Date"])
-
 df_hist.to_csv(HIST_FILE, index=False)
 
-# --- Load S&P 500 data safely ---
-try:
-    sp500 = yf.download("^GSPC", start=df_hist["Date"].min(), end=today)
-    if sp500.empty:
-        raise ValueError("No S&P 500 data returned. Possibly weekend or holiday.")
+# --- Load long-term S&P 500 data ---
+sp500 = yf.download("^GSPC", start=df_hist["Date"].min(), end=today)
 
-    # Flatten MultiIndex columns if present
+if sp500.empty:
+    st.warning("⚠️ No S&P 500 data returned.")
+else:
     if isinstance(sp500.columns, pd.MultiIndex):
         sp500.columns = sp500.columns.get_level_values(0)
-
     sp500 = sp500.reset_index()
-    if "Date" not in sp500.columns:
-        sp500.rename(columns={"index": "Date"}, inplace=True)
-
-    # Use Adj Close if available, else Close
     if "Adj Close" in sp500.columns:
         sp500.rename(columns={"Adj Close": "S&P500"}, inplace=True)
     elif "Close" in sp500.columns:
         sp500.rename(columns={"Close": "S&P500"}, inplace=True)
-    else:
-        raise KeyError("Neither 'Adj Close' nor 'Close' found in S&P 500 data.")
-
-    # ✅ Convert S&P Date to datetime too
     sp500["Date"] = pd.to_datetime(sp500["Date"])
 
-except Exception as e:
-    st.warning(f"⚠️ Could not load S&P 500 data: {e}")
-    sp500 = pd.DataFrame(columns=["Date", "S&P500"])
-
-# --- Merge all datasets ---
-if not sp500.empty:
+    # --- Merge and compute log prices ---
     df_merged = pd.merge(df_hist, sp500[["Date", "S&P500"]], on="Date", how="inner")
+    df_merged["Log S&P500"] = np.log(df_merged["S&P500"])
 
-    # Normalize for comparison
-    for col in ["Tech Sentiment", "Market Sentiment", "S&P500"]:
-        if df_merged[col].std() != 0:
-            df_merged[f"{col} (Norm)"] = (df_merged[col] - df_merged[col].mean()) / df_merged[col].std()
-        else:
-            df_merged[f"{col} (Norm)"] = 0
+    # --- Scale sentiment for plotting (match range roughly) ---
+    sentiment_scaled = (df_merged["Market Sentiment"] - df_merged["Market Sentiment"].mean()) * 2000 + df_merged["Log S&P500"].mean()
 
-    # Plot comparison
-    st.subheader("📈 Backtest: Tech & Market Sentiment vs S&P 500")
+    # --- Plot ---
+    st.subheader("📈 Long-Term Market Sentiment vs log(S&P 500)")
     fig, ax = plt.subplots(figsize=(8, 4))
-    ax.plot(df_merged["Date"], df_merged["Tech Sentiment (Norm)"], label="Tech Sentiment (Normalized)")
-    ax.plot(df_merged["Date"], df_merged["Market Sentiment (Norm)"], label="Market Sentiment (Normalized)")
-    ax.plot(df_merged["Date"], df_merged["S&P500 (Norm)"], label="S&P 500 (Normalized)")
+    ax.plot(df_merged["Date"], df_merged["Log S&P500"], label="log(S&P 500)", color="green")
+    ax.plot(df_merged["Date"], sentiment_scaled, label="Market Sentiment (scaled)", color="blue")
     ax.set_xlabel("Date")
-    ax.set_ylabel("Normalized Value")
+    ax.set_ylabel("Log Price / Scaled Sentiment")
     ax.legend()
-    ax.set_title("Technology & Market Sentiment vs S&P 500 Trend")
+    ax.set_title("Market Sentiment vs log(S&P 500) Over Time")
     st.pyplot(fig)
 
-    # Display correlation statistics
-    corr_tech = df_merged["Tech Sentiment"].corr(df_merged["S&P500"])
-    corr_market = df_merged["Market Sentiment"].corr(df_merged["S&P500"])
-    st.markdown(f"""
-    **📊 Correlation with S&P 500**  
-    - Tech Sentiment → S&P 500: `{corr_tech:.3f}`  
-    - Market Sentiment → S&P 500: `{corr_market:.3f}`
-    """)
-else:
-    st.warning("⚠️ Skipping backtest chart — no valid S&P 500 data for this date range.")
+    # --- Correlation (direct) ---
+    corr = df_merged["Market Sentiment"].corr(df_merged["Log S&P500"])
+    st.markdown(f"**📊 Correlation between Market Sentiment and log(S&P 500):** `{corr:.3f}`")
+
 
 
 
