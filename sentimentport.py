@@ -191,6 +191,9 @@ if os.path.exists(HIST_FILE):
 else:
     df_hist = df_new
 
+# ✅ Convert Date to datetime for consistency
+df_hist["Date"] = pd.to_datetime(df_hist["Date"])
+
 df_hist.to_csv(HIST_FILE, index=False)
 
 # --- Load S&P 500 data safely ---
@@ -214,6 +217,10 @@ try:
         sp500.rename(columns={"Close": "S&P500"}, inplace=True)
     else:
         raise KeyError("Neither 'Adj Close' nor 'Close' found in S&P 500 data.")
+
+    # ✅ Convert S&P Date to datetime too
+    sp500["Date"] = pd.to_datetime(sp500["Date"])
+
 except Exception as e:
     st.warning(f"⚠️ Could not load S&P 500 data: {e}")
     sp500 = pd.DataFrame(columns=["Date", "S&P500"])
@@ -251,6 +258,7 @@ if not sp500.empty:
     """)
 else:
     st.warning("⚠️ Skipping backtest chart — no valid S&P 500 data for this date range.")
+
 
 
 
