@@ -7,4 +7,4 @@ tqdm
 vaderSentiment
 transformers==4.45.1
 torch==2.5.0
-
+yfinance
